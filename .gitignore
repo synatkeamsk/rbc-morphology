@@ -1,0 +1,18 @@
+# Datasets & Checkpoints (Never commit raw data or model weights)
+data/
+checkpoints/
+*.pt
+*.pth
+*.onnx
+*.zip
+*.tar.gz
+
+# Python Environment & Cache
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+.ipynb_checkpoints/
+.vscode/
+.idea/
