@@ -38,7 +38,7 @@ class Config:
     weight_decay: float = 1e-4
 
     # Backbone architecture
-    backbone: str = "convnext_nano.in12k_ft_in1k_224"
+    backbone: str = "convnext_nano"
     pretrained: bool = True
     dropout_rate: float = 0.3
 

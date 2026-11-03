@@ -137,7 +137,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_csv", type=str, default="data/splits/train.csv")
     parser.add_argument("--val_csv", type=str, default="data/splits/val.csv")
     parser.add_argument("--num_classes", type=int, default=8)
-    parser.add_argument("--backbone", type=str, default="convnext_nano.in12k_ft_in1k_224")
+    parser.add_argument("--backbone", type=str, default="convnext_nano")
     parser.add_argument("--img_size", type=int, default=224)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--epochs", type=int, default=30)

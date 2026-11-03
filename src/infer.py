@@ -81,7 +81,7 @@ def export_to_onnx(
     checkpoint_path: str,
     output_onnx_path: str,
     num_classes: int,
-    backbone_name: str = "convnext_nano.in12k_ft_in1k_224",
+    backbone_name: str = "convnext_nano",
     img_size: int = 224
 ):
     print(f"Loading checkpoint: {checkpoint_path}")
@@ -100,7 +100,7 @@ def export_to_onnx(
         dummy_input,
         output_onnx_path,
         export_params=True,
-        opset_version=14,
+        opset_version=18,
         do_constant_folding=True,
         input_names=["input"],
         output_names=["logits"],

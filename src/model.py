@@ -13,7 +13,7 @@ class SmearScopeClassifier(nn.Module):
     def __init__(
         self,
         num_classes: int = 8,
-        backbone_name: str = "convnext_nano.in12k_ft_in1k_224",
+        backbone_name: str = "convnext_nano",
         pretrained: bool = True,
         dropout_rate: float = 0.3
     ):
@@ -43,7 +43,7 @@ class SmearScopeClassifier(nn.Module):
 
 def get_model(
     num_classes: int,
-    backbone_name: str = "convnext_nano.in12k_ft_in1k_224",
+    backbone_name: str = "convnext_nano",
     pretrained: bool = True,
     device: Optional[str] = None
 ) -> SmearScopeClassifier:
