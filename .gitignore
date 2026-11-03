@@ -16,3 +16,79 @@ venv/
 .ipynb_checkpoints/
 .vscode/
 .idea/
+# Python / Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+
+# Data
+data/raw/*
+!data/raw/.gitkeep
+data/splits/*
+!data/splits/.gitkeep
+
+# Checkpoints & Model Weights
+*.pt
+*.pth
+*.onnx
+*.bin
+checkpoints/*
+!checkpoints/.gitkeep
+runs/
+wandb/
+
+
+
+# Python / Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+
+# Data
+data/raw/*
+!data/raw/.gitkeep
+data/splits/*
+!data/splits/.gitkeep
+
+# Checkpoints & Model Weights
+*.pt
+*.pth
+*.onnx
+*.bin
+checkpoints/*
+!checkpoints/.gitkeep
+runs/
+wandb/
+
+# Jupyter / Colab
+.ipynb_checkpoints/
+
+# Python / Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+
+# Data
+data/raw/*
+!data/raw/.gitkeep
+data/splits/*
+!data/splits/.gitkeep
+
+# Checkpoints & Model Weights
+*.pt
+*.pth
+*.onnx
+*.bin
+checkpoints/*
+!checkpoints/.gitkeep
+runs/
+wandb/
+
+# Jupyter / Colab
+.ipynb_checkpoints/
