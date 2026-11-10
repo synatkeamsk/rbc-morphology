@@ -92,3 +92,7 @@ wandb/
 
 # Jupyter / Colab
 .ipynb_checkpoints/
+data/raw/
+data/processed/
+*.zip
+*.tar.gz
