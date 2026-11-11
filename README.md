@@ -38,6 +38,26 @@ SmearScope classifies single-cell erythrocyte patches into **11 distinct morphol
 
 ---
 
+## 🔬 Supported Erythrocyte Variants (11 Classes)
+---
+SmearScope classifies single-cell erythrocyte patches into **11 distinct morphological categories** based on the [Chula-RBC-12 Dataset](https://github.com/Chula-PIC-Lab/Chula-RBC-12-Dataset):
+
+| Morphological Class | Sample | Clinical Description | Associated Conditions |
+| :--- | :---: | :--- | :--- |
+| **Normal (Discocyte)** | <img src="docs/assets/normal.png" width="70"/> | Biconcave disc with central pallor (~1/3 diameter) | Healthy baseline |
+| **Schistocyte** | <img src="docs/assets/schistocyte.png" width="70"/> | Fragmented, jagged erythrocyte | Thrombotic Microangiopathy (TTP/HUS), DIC |
+| **Teardrop (Dacrocyte)** | <img src="docs/assets/teardrop.png" width="70"/> | Tapered, pear- or drop-shaped cell | Primary Myelofibrosis, Marrow Infiltration |
+| **Burr Cell (Echinocyte)** | <img src="docs/assets/burr_cell.png" width="70"/> | Crenated cell with short, uniform membrane projections | Uremia, Chronic Kidney Disease, Artifact |
+| **Spherocyte** | <img src="docs/assets/spherocyte.png" width="70"/> | Dense, spherical cell lacking central pallor | Hereditary Spherocytosis, Autoimmune Hemolytic Anemia |
+| **Target Cell** | <img src="docs/assets/target_cell.png" width="70"/> | "Bullseye" pattern with central hemoglobin distribution | Hemoglobinopathies (Thalassemia, HbC), Liver Disease |
+| **Ovalocyte** | <img src="docs/assets/ovalocyte.png" width="70"/> | Egg-shaped / oval erythrocyte | Megaloblastic Anemia, Myelodysplasia |
+| **Elliptocyte** | <img src="docs/assets/elliptocyte.png" width="70"/> | Elongated, rod-like erythrocyte | Hereditary Elliptocytosis, Severe Iron Deficiency |
+| **Stomatocyte** | <img src="docs/assets/stomatocyte.png" width="70"/> | Slit-like, "mouth-shaped" central pallor | Hereditary Stomatocytosis, Alcoholism |
+| **Microcyte** | <img src="docs/assets/microcyte.png" width="70"/> | Abnormally small red blood cell (< 6 µm) | Iron Deficiency Anemia, Thalassemia Minor |
+| **Macrocyte** | <img src="docs/assets/macrocyte.png" width="70"/> | Abnormally large red blood cell (> 8 µm) | Vitamin B12 / Folate Deficiency, Liver Disease |
+| **Hypochromia** | <img src="docs/assets/hypochromia.png" width="70"/> | Pale cell with central pallor > 1/3 diameter | Chronic Iron Deficiency Anemia |
+---
+
 ## 📁 Repository Structure
 
 ```text
