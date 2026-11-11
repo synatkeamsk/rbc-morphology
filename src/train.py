@@ -1,14 +1,15 @@
 """
 src/train.py
-Mixed-precision training loop with Focal Loss for imbalanced RBC variants.
+Mixed-precision training loop with class-imbalance weighting and validation tracking.
 """
 
 import os
 import argparse
+import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from sklearn.metrics import classification_report, f1_score
@@ -19,6 +20,7 @@ from src.model import get_model
 
 
 class FocalLoss(nn.Module):
+    """Focal Loss to counter extreme class imbalance in rare RBC variants."""
     def __init__(self, alpha: torch.Tensor = None, gamma: float = 2.0):
         super().__init__()
         self.alpha = alpha
@@ -33,13 +35,15 @@ class FocalLoss(nn.Module):
 
 def train_one_epoch(model, loader, criterion, optimizer, scaler, device):
     model.train()
-    running_loss, correct, total = 0.0, 0, 0
+    running_loss = 0.0
+    correct = 0
+    total = 0
 
     for images, targets in tqdm(loader, desc="Training", leave=False):
         images, targets = images.to(device, non_blocking=True), targets.to(device, non_blocking=True)
         optimizer.zero_grad()
 
-        with autocast():
+        with autocast(device_type="cuda" if device.type == "cuda" else "cpu"):
             outputs = model(images)
             loss = criterion(outputs, targets)
 
@@ -59,12 +63,13 @@ def train_one_epoch(model, loader, criterion, optimizer, scaler, device):
 def evaluate(model, loader, criterion, device):
     model.eval()
     running_loss = 0.0
-    all_preds, all_targets = [], []
+    all_preds = []
+    all_targets = []
 
     for images, targets in tqdm(loader, desc="Validating", leave=False):
         images, targets = images.to(device, non_blocking=True), targets.to(device, non_blocking=True)
 
-        with autocast():
+        with autocast(device_type="cuda" if device.type == "cuda" else "cpu"):
             outputs = model(images)
             loss = criterion(outputs, targets)
 
@@ -83,11 +88,13 @@ def main(args):
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     os.makedirs(args.checkpoint_dir, exist_ok=True)
 
+    print(f"Loading metadata from {args.train_csv} and {args.val_csv}...")
     train_df = pd.read_csv(args.train_csv)
     val_df = pd.read_csv(args.val_csv)
 
+    # Square-root smoothed class weights to prevent normal cell suppression
     class_counts = train_df["label"].value_counts().sort_index().values
-    class_weights = 1.0 / (class_counts + 1e-5)
+    class_weights = 1.0 / (np.sqrt(class_counts) + 1e-5)
     class_weights = torch.FloatTensor(class_weights / class_weights.sum()).to(device)
 
     train_loader, val_loader = create_dataloaders(
@@ -98,11 +105,13 @@ def main(args):
         num_workers=args.num_workers
     )
 
+    print(f"Building model: {args.backbone} with {args.num_classes} classes...")
     model = get_model(num_classes=args.num_classes, backbone_name=args.backbone, device=device)
+
     criterion = FocalLoss(alpha=class_weights, gamma=2.0)
     optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
-    scaler = GradScaler()
+    scaler = GradScaler("cuda" if device.type == "cuda" else "cpu")
 
     best_macro_f1 = 0.0
 
@@ -126,9 +135,9 @@ def main(args):
                 "macro_f1": macro_f1,
                 "classes": args.num_classes
             }, checkpoint_path)
-            print(f"[*] Checkpoint saved: {checkpoint_path} (Macro-F1: {best_macro_f1:.4f})")
+            print(f"[*] New best Macro-F1: {best_macro_f1:.4f} -> Saved to {checkpoint_path}")
 
-    print("\n--- Final Classification Report ---")
+    print("\n--- Final Best Model Evaluation Report ---")
     print(classification_report(targets, preds, digits=4, zero_division=0))
 
 
@@ -136,15 +145,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SmearScope RBC Training Pipeline")
     parser.add_argument("--train_csv", type=str, default="data/splits/train.csv")
     parser.add_argument("--val_csv", type=str, default="data/splits/val.csv")
-    parser.add_argument("--num_classes", type=int, default=8)
+    parser.add_argument("--num_classes", type=int, default=12)
     parser.add_argument("--backbone", type=str, default="convnext_nano")
     parser.add_argument("--img_size", type=int, default=224)
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--epochs", type=int, default=30)
+    parser.add_argument("--epochs", type=int, default=25)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--weight_decay", type=float, default=1e-4)
-    parser.add_argument("--num_workers", type=int, default=4)
+    parser.add_argument("--num_workers", type=int, default=2)
     parser.add_argument("--checkpoint_dir", type=str, default="checkpoints")
     parser.add_argument("--device", type=str, default="cuda")
+
     args = parser.parse_args()
     main(args)

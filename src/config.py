@@ -15,7 +15,7 @@ except ImportError:
 
 @dataclass
 class Config:
-    # 11 Morphological classes matching Chula-RBC-12 dataset
+    # 12 Morphological classes matching Chula-RBC-12 dataset
     classes: List[str] = field(default_factory=lambda: [
         "burr_cell",
         "elliptocyte",
@@ -27,6 +27,7 @@ class Config:
         "schistocyte",
         "spherocyte",
         "stomatocyte",
+        "target_cell",
         "teardrop"
     ])
 
@@ -39,13 +40,13 @@ class Config:
     # Image & Training specs
     img_size: int = 224
     batch_size: int = 32
-    num_workers: int = 4
-    epochs: int = 30
+    num_workers: int = 2
+    epochs: int = 25
     lr: float = 3e-4
     weight_decay: float = 1e-4
 
     # Backbone architecture
-    backbone: str = "convnext_nano.in12k_ft_in1k_224"
+    backbone: str = "convnext_nano"
     pretrained: bool = True
     dropout_rate: float = 0.3
 
@@ -58,5 +59,4 @@ class Config:
         return len(self.classes)
 
 
-# Default config instance
 cfg = Config()
