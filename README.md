@@ -57,14 +57,6 @@ SmearScope classifies single-cell erythrocyte patches into **11 distinct morphol
 | **Macrocyte** | <img src="docs/assets/macrocyte.png" width="70"/> | Abnormally large red blood cell (> 8 µm) | Vitamin B12 / Folate Deficiency, Liver Disease |
 | **Hypochromia** | <img src="docs/assets/hypochromia.png" width="70"/> | Pale cell with central pallor > 1/3 diameter | Chronic Iron Deficiency Anemia |
 ---
----
-<p align="center">
-  <img src="docs/assets/full_smear_raw.jpg" width="48%" alt="Raw Blood Smear Field"/>
-  <img src="docs/assets/full_smear_annotated.jpg" width="48%" alt="Annotated Blood Smear Field"/>
-  <br>
-  <em>Figure 1: Full-field peripheral blood smear (PBS) under 1000× oil-immersion microscopy. Left: Raw digitized smear. Right: Automated multi-class erythrocyte localization and morphological classification.</em>
-</p>
---- 
 
 ## 📁 Repository Structure
 
