@@ -1,11 +1,7 @@
 """
 src/prepare_chula_rbc.py
-Processes the Chula-RBC-12 dataset:
-1. Parses coordinates (x, y) and class labels from Label/*.txt.
-2. Crops single RBC patches (96x96) with reflective boundary padding.
-3. Saves cropped images to data/processed/crops/.
-4. Remaps labels to continuous integers (0 to N-1) for PyTorch.
-5. Performs stratified train/validation split and generates data/splits/train.csv and val.csv.
+Processes the Chula-RBC-12 dataset with LEAKAGE-FREE SLIDE-LEVEL SPLITTING.
+Guarantees that cells from the same blood smear slide never appear in both train and val.
 """
 
 import os
@@ -14,10 +10,9 @@ import json
 import cv2
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedGroupKFold
 from tqdm import tqdm
 
-# Original Chula-RBC-12 class mapping (10 is 'uncategorized' and excluded)
 CLASS_NAMES = {
     0: "normal",
     1: "macrocyte",
@@ -35,10 +30,6 @@ CLASS_NAMES = {
 
 
 def crop_cell(image: np.ndarray, x: int, y: int, crop_size: int = 96) -> np.ndarray:
-    """
-    Crops a square region of size (crop_size, crop_size) centered at (x, y).
-    Applies reflective boundary padding if the crop extends beyond image borders.
-    """
     h, w = image.shape[:2]
     half = crop_size // 2
 
@@ -52,11 +43,7 @@ def crop_cell(image: np.ndarray, x: int, y: int, crop_size: int = 96) -> np.ndar
 
     if pad_left > 0 or pad_top > 0 or pad_right > 0 or pad_bottom > 0:
         padded = cv2.copyMakeBorder(
-            image,
-            top=pad_top,
-            bottom=pad_bottom,
-            left=pad_left,
-            right=pad_right,
+            image, top=pad_top, bottom=pad_bottom, left=pad_left, right=pad_right,
             borderType=cv2.BORDER_REFLECT
         )
         return padded[y1 + pad_top : y2 + pad_top, x1 + pad_left : x2 + pad_left]
@@ -69,23 +56,19 @@ def process_dataset(
     output_crop_dir: str = "data/processed/crops",
     splits_dir: str = "data/splits",
     crop_size: int = 96,
-    val_ratio: float = 0.2,
     seed: int = 42
 ):
     dataset_dir = os.path.join(raw_dir, "Dataset")
     label_dir = os.path.join(raw_dir, "Label")
 
     if not os.path.exists(dataset_dir) or not os.path.exists(label_dir):
-        raise FileNotFoundError(
-            f"Dataset or Label folder not found inside '{raw_dir}'. "
-            f"Please verify that {raw_dir}/Dataset and {raw_dir}/Label exist."
-        )
+        raise FileNotFoundError(f"Missing {raw_dir}/Dataset or Label directory.")
 
     os.makedirs(output_crop_dir, exist_ok=True)
     os.makedirs(splits_dir, exist_ok=True)
 
     image_files = sorted(glob.glob(os.path.join(dataset_dir, "*.jpg")))
-    print(f"Found {len(image_files)} full blood smear images in {dataset_dir}...")
+    print(f"Found {len(image_files)} full blood smear images...")
 
     records = []
     cell_counter = 0
@@ -116,7 +99,6 @@ def process_dataset(
             except ValueError:
                 continue
 
-            # Skip uncategorized (class 10) or invalid class IDs
             if class_id not in CLASS_NAMES:
                 continue
 
@@ -132,34 +114,37 @@ def process_dataset(
 
             records.append({
                 "image_path": crop_filepath,
+                "slide_id": base_name,  # Tracks parent smear image to prevent leakage!
                 "original_label": class_id,
                 "class_name": class_name
             })
             cell_counter += 1
 
     df = pd.DataFrame(records)
-    print(f"\nSuccessfully extracted {len(df)} single RBC crops!")
-    print("\nClass distribution:")
-    print(df["class_name"].value_counts())
+    print(f"\nExtracted {len(df)} total crops across {df['class_name'].nunique()} classes.")
 
-    # Remap distinct class names to contiguous integers: 0, 1, 2, ..., N-1
+    # 12 Classes sorted alphabetically
     unique_class_names = sorted(df["class_name"].unique())
     class_to_idx = {name: idx for idx, name in enumerate(unique_class_names)}
     df["label"] = df["class_name"].map(class_to_idx)
 
-    # Save class mapping dictionary to JSON for inference reference
+    # Save 12-class JSON mapping
     mapping_file = os.path.join(splits_dir, "class_mapping.json")
     with open(mapping_file, "w") as f:
         json.dump(class_to_idx, f, indent=2)
-    print(f"\n[*] Class mapping saved to: {mapping_file}")
 
-    # Stratified split into train (80%) and validation (20%)
-    train_df, val_df = train_test_split(
-        df,
-        test_size=val_ratio,
-        stratify=df["label"],
-        random_state=seed
-    )
+    # LEAKAGE-FREE SPLIT: StratifiedGroupKFold on slide_id
+    # Guarantees that slides in train NEVER appear in validation
+    sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=seed)
+    train_idx, val_idx = next(sgkf.split(df, df["label"], groups=df["slide_id"]))
+
+    train_df = df.iloc[train_idx].copy()
+    val_df = df.iloc[val_idx].copy()
+
+    # Verify zero slide overlap
+    train_slides = set(train_df["slide_id"].unique())
+    val_slides = set(val_df["slide_id"].unique())
+    assert len(train_slides.intersection(val_slides)) == 0, "Data Leakage Detected!"
 
     train_path = os.path.join(splits_dir, "train.csv")
     val_path = os.path.join(splits_dir, "val.csv")
@@ -167,8 +152,10 @@ def process_dataset(
     train_df.to_csv(train_path, index=False)
     val_df.to_csv(val_path, index=False)
 
-    print(f"[*] Training split saved ({len(train_df)} cells): {train_path}")
-    print(f"[*] Validation split saved ({len(val_df)} cells): {val_path}")
+    print(f"\n[*] LEAKAGE-FREE SPLIT COMPLETE:")
+    print(f"    Train: {len(train_df)} cells across {len(train_slides)} distinct smear slides")
+    print(f"    Val:   {len(val_df)} cells across {len(val_slides)} distinct smear slides")
+    print(f"    Slide overlap: ZERO (Clean clinical separation)")
 
 
 if __name__ == "__main__":
