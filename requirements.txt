@@ -12,3 +12,4 @@ tqdm>=4.66.0
 onnx>=1.14.0
 onnxruntime>=1.15.0
 onnxscript>=0.1.0
+streamlit>=1.30.0
