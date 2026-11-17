@@ -231,8 +231,7 @@ def detect_and_crop_rbcs(
             roi_mask = labels[y0 : y0 + bh, x0 : x0 + bw] == lbl
             candidates.append((roi_mask, x0, y0, bw, bh, area, cx, cy, x0, y0))
 
-    cells: List[DetectedCell] = []
-    cell_idx = 0
+    pre_cells = []
     for local_mask, x0, y0, bw, bh, area, cx, cy, m_xoff, m_yoff in candidates:
         if x0 <= 2 or y0 <= 2 or (x0 + bw) >= (w - 2) or (y0 + bh) >= (h - 2):
             continue
@@ -244,12 +243,23 @@ def detect_and_crop_rbcs(
         if float(diff_roi[local_mask].mean()) < min_contrast:
             continue
 
-        if filter_wbc:
-            bgr_roi = bgr[m_yoff : m_yoff + mh, m_xoff : m_xoff + mw]
-            mean_bgr = bgr_roi[local_mask].mean(axis=0)
-            mean_gray = float(mean_bgr.mean())
-            if (mean_bgr[0] - mean_bgr[2]) > 5.0 and mean_gray < 125.0:
-                continue
+        bgr_roi = bgr[m_yoff : m_yoff + mh, m_xoff : m_xoff + mw]
+        mean_bgr = bgr_roi[local_mask].mean(axis=0)
+        mean_gray = float(mean_bgr.mean())
+        b_minus_r = float(mean_bgr[0] - mean_bgr[2])
+        pre_cells.append((x0, y0, bw, bh, area, cx, cy, mean_gray, b_minus_r))
+
+    if not pre_cells:
+        return [], used_crop, filled, clf_bgr
+
+    med_gray = float(np.median([c[7] for c in pre_cells]))
+    med_br = float(np.median([c[8] for c in pre_cells]))
+
+    cells: List[DetectedCell] = []
+    cell_idx = 0
+    for x0, y0, bw, bh, area, cx, cy, mean_gray, b_minus_r in pre_cells:
+        if filter_wbc and (mean_gray < med_gray - 22.0) and ((b_minus_r - med_br) > 10.0):
+            continue
 
         patch = crop_center_patch(clf_bgr, cx, cy, crop_size=used_crop)
         cells.append(
