@@ -10,8 +10,8 @@ sys.path.insert(0, str(ROOT))
 from src.config import cfg
 from src.model import get_model
 
-CKPT_PATH = ROOT / "model_training_obj/Iteration 14-11-2026/best_smearscope.pt"
-OUT_ONNX = ROOT / "model_training_obj/Iteration 14-11-2026/smearscope_deploy.onnx"
+CKPT_PATH = ROOT / "model_training/v05_leakage_free/best_smearscope.pt"
+OUT_ONNX = ROOT / "model_training/v05_leakage_free/smearscope_deploy.onnx"
 
 model = get_model(
     num_classes=cfg.num_classes,

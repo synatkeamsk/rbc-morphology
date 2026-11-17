@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT))
 from src.config import cfg
 from app.cropper import detect_and_crop_rbcs
 
-DEFAULT_ONNX = ROOT / "model_training_obj/Iteration 14-11-2026/smearscope_deploy.onnx"
+DEFAULT_ONNX = ROOT / "model_training/v05_leakage_free/smearscope_deploy.onnx"
 MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
