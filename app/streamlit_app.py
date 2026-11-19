@@ -1,6 +1,6 @@
 """
 app/streamlit_app.py
-SmearScope Lab Testing Interface (Full Blood Smear Auto-Crop + ONNX Classification).
+SmearScope Lab Testing Interface (Full Blood Smear, Phone Eyepiece Converter, and Crop Mode).
 Research Use Only - Not for standalone clinical diagnosis.
 """
 
@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.config import cfg
-from app.cropper import detect_and_crop_rbcs
+from app.cropper import convert_phone_eyepiece_to_chula, detect_and_crop_rbcs
 
 DEFAULT_ONNX = ROOT / "model_training/v05_leakage_free/smearscope_deploy.onnx"
 MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
@@ -58,17 +58,29 @@ with st.sidebar:
     model_path = st.text_input("ONNX Model Path", value=str(DEFAULT_ONNX))
     input_mode = st.radio(
         "Input Type",
-        ["Full Blood Smear (Auto-Crop RBCs)", "Already Cropped Single RBC(s)"],
+        [
+            "Full Blood Smear (Auto-Crop RBCs)",
+            "Phone / Eyepiece Photo (Convert → Chula)",
+            "Already Cropped Single RBC(s)",
+        ],
     )
     conf_thresh = st.slider("Uncertain Confidence Threshold", 0.30, 0.95, 0.65, 0.05)
 
-    if input_mode == "Full Blood Smear (Auto-Crop RBCs)":
-        stain_match = st.checkbox("Match Chula Stain Colors (LAB)", value=True)
-        crop_mode = st.radio("Crop Scale", ["Auto-Calibrate to Smear RBC Size", "Fixed 96×96 px (Chula Scale)"])
-        custom_crop = None if crop_mode.startswith("Auto") else 96
-        crop_scale_factor = st.slider("Crop Multiplier (× RBC Diameter)", 1.0, 2.8, 1.8, 0.05)
+    if input_mode != "Already Cropped Single RBC(s)":
+        is_phone = input_mode.startswith("Phone")
+        if is_phone:
+            fov_margin = st.slider("Eyepiece Circle Inner Margin", 0.70, 0.95, 0.88, 0.02)
+            stain_match = st.checkbox("Match Chula Stain Colors (LAB)", value=True)
+            custom_crop = 96
+            crop_scale_factor = 2.25
+        else:
+            stain_match = st.checkbox("Match Chula Stain Colors (LAB)", value=True)
+            crop_mode = st.radio("Crop Scale", ["Auto-Calibrate to Smear RBC Size", "Fixed 96×96 px (Chula Scale)"])
+            custom_crop = None if crop_mode.startswith("Auto") else 96
+            crop_scale_factor = st.slider("Crop Multiplier (× RBC Diameter)", 1.0, 2.8, 2.25, 0.05)
+
         rim_sensitivity = st.slider("Pale Rim Sensitivity", 0.35, 1.00, 0.65, 0.05)
-        min_contrast = st.slider("Min Cell Contrast vs Plasma", 8, 40, 16, 2)
+        min_contrast = st.slider("Min Cell Contrast vs Plasma", 8, 40, 14 if is_phone else 16, 2)
         split_touching = st.checkbox("Split Touching RBC Clumps", value=True)
         filter_wbc = st.checkbox("Filter Dark Purple WBC Nuclei", value=True)
         min_area = st.slider("Min Candidate Area (px²)", 100, 1000, 250, 50)
@@ -82,29 +94,43 @@ session, input_name = load_onnx_session(model_path)
 classes = sorted(cfg.classes)
 
 uploaded_files = st.file_uploader(
-    "Upload peripheral blood smear image(s)" if input_mode.startswith("Full") else "Upload cropped RBC image(s)",
+    "Upload cropped RBC image(s)" if input_mode.startswith("Already") else "Upload blood smear image",
     type=["png", "jpg", "jpeg", "tif", "tiff", "bmp"],
-    accept_multiple_files=(not input_mode.startswith("Full")),
+    accept_multiple_files=input_mode.startswith("Already"),
 )
 
 if not uploaded_files:
     st.info("Upload an image to begin testing.")
     st.stop()
 
-if input_mode.startswith("Full"):
+if not input_mode.startswith("Already"):
     file_bytes = np.asarray(bytearray(uploaded_files.read()), dtype=np.uint8)
     bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
     if bgr is None:
         st.error("Could not decode uploaded image.")
         st.stop()
 
-    with st.spinner("Detecting, stain-matching, cropping, and classifying RBCs..."):
+    converted_bgr = None
+    with st.spinner("Processing smear and classifying RBCs..."):
+        work_bgr = bgr
+        run_stain_in_cropper = stain_match
+
+        if input_mode.startswith("Phone"):
+            converted_bgr, est_diam = convert_phone_eyepiece_to_chula(
+                bgr,
+                fov_margin=fov_margin,
+                target_cell_diam=42.0,
+                apply_stain_match=stain_match,
+            )
+            work_bgr = converted_bgr
+            run_stain_in_cropper = False  # already applied above
+
         cells, used_crop, seg_mask, view_bgr = detect_and_crop_rbcs(
-            bgr,
+            work_bgr,
             crop_size=custom_crop,
             auto_scale_crop=(custom_crop is None),
             crop_scale_factor=crop_scale_factor,
-            stain_match=stain_match,
+            stain_match=run_stain_in_cropper,
             split_touching=split_touching,
             rim_sensitivity=rim_sensitivity,
             min_contrast=min_contrast,
@@ -112,15 +138,30 @@ if input_mode.startswith("Full"):
             min_area_px=min_area,
         )
 
-        if not cells:
-            st.warning("No RBCs passed filtering. Try lowering Min Cell Contrast or Pale Rim Sensitivity.")
-            if show_mask:
-                st.image(seg_mask, caption="Segmentation Mask", width="stretch")
-            st.stop()
+    if converted_bgr is not None:
+        ok, png_buf = cv2.imencode(".png", converted_bgr)
+        st.info(
+            f"Converted phone photo → `{converted_bgr.shape[1]}×{converted_bgr.shape[0]}px` Chula-scale smear (RBCs rescaled to ~42px)."
+        )
+        if ok:
+            st.download_button(
+                "Download Converted Chula-Style Image (.png)",
+                data=png_buf.tobytes(),
+                file_name="converted_chula_smear.png",
+                mime="image/png",
+            )
 
-        batch_x = preprocess_batch([c.crop_bgr for c in cells], img_size=cfg.img_size)
-        logits = session.run(None, {input_name: batch_x})[0]
-        probs = softmax_batch(logits)
+    if not cells:
+        st.warning("No RBCs passed filtering. Try lowering Min Cell Contrast or Pale Rim Sensitivity.")
+        if converted_bgr is not None:
+            st.image(cv2.cvtColor(converted_bgr, cv2.COLOR_BGR2RGB), caption="Converted Image", width="stretch")
+        if show_mask:
+            st.image(seg_mask, caption="Segmentation Mask", width="stretch")
+        st.stop()
+
+    batch_x = preprocess_batch([c.crop_bgr for c in cells], img_size=cfg.img_size)
+    logits = session.run(None, {input_name: batch_x})[0]
+    probs = softmax_batch(logits)
 
     rows = []
     annotated = view_bgr.copy()
